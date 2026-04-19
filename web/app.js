@@ -13,6 +13,17 @@ const exportJsonButton = document.getElementById("export-json-btn");
 const exportOpenEpaperLinkButton = document.getElementById("export-openepaperlink-btn");
 const exportOutput = document.getElementById("export-output");
 const deleteTextButton = document.getElementById("delete-text-btn");
+const widthInput = document.getElementById("width-input");
+const heightInput = document.getElementById("height-input");
+const etagForm = document.getElementById("etag-form");
+const presetSelect = document.getElementById("preset-select");
+const setSizeButton = document.getElementById("set-size-btn");
+
+const presets = {
+  "296x128": { width: 296, height: 128 },
+  "384x168": { width: 384, height: 168 },
+  "400x300": { width: 400, height: 300 }
+};
 
 deleteTextButton.hidden = true;
 
@@ -22,8 +33,8 @@ let dragOffset = { x: 0, y: 0 };
 let nextElementId = 1;
 
 const layout = {
-  width: 296,
-  height: 128,
+  width: 500,
+  height: 500,
   elements: []
 };
 
@@ -90,8 +101,8 @@ function updateSelectedElement() {
   if (!element) return;
 
   element.text = textInput.value;
-  element.x = Number(xInput.value);
-  element.y = Number(yInput.value);
+  element.x = Math.round(Number(xInput.value));
+  element.y = Math.round(Number(yInput.value));
   element.fontSize = Number(fontSizeInput.value);
   element.fontWeight = boldInput.checked ? "bold" : "normal";
   element.fontStyle = italicInput.checked ? "italic" : "normal";
@@ -213,8 +224,8 @@ canvas.addEventListener("mousemove", (event) => {
   if (!element) return;
 
   const point = svgPoint(event);
-  element.x = point.x - dragOffset.x;
-  element.y = point.y - dragOffset.y;
+  element.x = Math.round(point.x - dragOffset.x);
+  element.y = Math.round(point.y - dragOffset.y);
   updateInspector();
   render();
 });
@@ -277,9 +288,36 @@ function exportOpenEpaperLink() {
 textForm.addEventListener("input", updateSelectedElement);
 deleteTextButton.addEventListener("click", deleteSelectedElement);
 addTextButton.addEventListener("click", () => {
-  addText(20, 40, "Ny text");
+  addText(50, 50, "New Text");
 });
 exportJsonButton.addEventListener("click", exportJson);
 exportOpenEpaperLinkButton.addEventListener("click", exportOpenEpaperLink);
 
-addText(10, 20, "Hello e-paper");
+function applySizeChange() {
+  const newWidth = Math.max(1, Math.min(10000, Number(widthInput.value)));
+  const newHeight = Math.max(1, Math.min(10000, Number(heightInput.value)));
+  layout.width = newWidth;
+  layout.height = newHeight;
+  canvas.setAttribute("width", newWidth);
+  canvas.setAttribute("height", newHeight);
+  canvas.setAttribute("viewBox", `0 0 ${newWidth} ${newHeight}`);
+  render();
+}
+
+presetSelect.addEventListener("change", () => {
+  const selectedPreset = presetSelect.value;
+  if (selectedPreset !== "custom" && presets[selectedPreset]) {
+    const { width, height } = presets[selectedPreset];
+    widthInput.value = width;
+    heightInput.value = height;
+  }
+});
+
+setSizeButton.addEventListener("click", (e) => {
+  e.preventDefault();
+  if (confirm("Are you sure you want to change format?")) {
+    applySizeChange();
+  }
+});
+
+addText(50, 50, "Hello e-paper");

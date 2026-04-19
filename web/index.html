@@ -9,18 +9,45 @@
   <body>
     <header>
       <h1>E-Paper WYSIWYG Layout Editor</h1>
-      <p class="status">Klicka ett textobjekt för att redigera det.</p>
+      <p class="status">Click a text object to edit it.</p>
     </header>
 
     <main>
       <section class="canvas-panel">
-        <svg id="canvas" width="296" height="128" viewBox="0 0 296 128"></svg>
-        <button id="add-text-btn" type="button">Lägg till text</button>
+        <svg id="canvas" width="500" height="500" viewBox="0 0 500 500"></svg>
+        <button id="add-text-btn" type="button">Add Text</button>
       </section>
 
       <aside class="inspector">
-        <h2>Text-egenskaper</h2>
-        <div id="inspector-empty">Markera ett textobjekt för att redigera.</div>
+        <h2>E-Tag Properties</h2>
+        <form id="etag-form">
+          <label>
+            Preset
+            <select id="preset-select">
+              <option value="custom">Custom</option>
+              <option value="296x128">296x128</option>
+              <option value="384x168">384x168</option>
+              <option value="400x300">400x300</option>
+            </select>
+          </label>
+
+          <label>
+            Width (px)
+            <input id="width-input" type="number" min="1" max="10000" step="1" value="500" />
+          </label>
+
+          <label>
+            Height (px)
+            <input id="height-input" type="number" min="1" max="10000" step="1" value="500" />
+          </label>
+
+          <button id="set-size-btn" type="button">Set Size</button>
+        </form>
+      </aside>
+
+      <aside class="inspector">
+        <h2>Text Properties</h2>
+        <div id="inspector-empty">Select a text object to edit.</div>
 
         <form id="text-form" hidden>
           <label>
@@ -39,37 +66,37 @@
           </label>
 
           <label>
-            Fontstorlek
+            Font Size
             <input id="font-size-input" type="number" min="6" max="72" step="1" />
           </label>
 
           <div class="inline-fields">
             <label>
-              <input id="bold-input" type="checkbox" /> Fet
+              <input id="bold-input" type="checkbox" /> Bold
             </label>
             <label>
-              <input id="italic-input" type="checkbox" /> Kursiv
+              <input id="italic-input" type="checkbox" /> Italic
             </label>
           </div>
 
           <label>
-            Justering
+            Alignment
             <select id="anchor-input">
-              <option value="start">Vänster</option>
-              <option value="middle">Centrerad</option>
-              <option value="end">Höger</option>
+              <option value="start">Left</option>
+              <option value="middle">Center</option>
+              <option value="end">Right</option>
             </select>
           </label>
 
-          <button id="delete-text-btn" type="button" class="danger-button">Ta bort text</button>
+          <button id="delete-text-btn" type="button" class="danger-button">Delete Text</button>
         </form>
 
         <div class="export-panel">
           <h3>Export</h3>
-          <button id="export-json-btn" type="button">Exportera JSON</button>
-          <button id="export-openepaperlink-btn" type="button">Exportera OpenEPaperLink</button>
+          <button id="export-json-btn" type="button">Export JSON</button>
+          <button id="export-openepaperlink-btn" type="button">Export OpenEPaperLink</button>
           <label>
-            Exportdata
+            Export Data
             <textarea id="export-output" readonly rows="8"></textarea>
           </label>
         </div>
