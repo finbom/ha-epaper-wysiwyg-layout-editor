@@ -1,19 +1,81 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <title>E-Paper Layout Editor</title>
-  <link rel="stylesheet" href="style.css" />
-</head>
-<body>
-  <header>
-    <h1>E-Paper WYSIWYG Layout Editor</h1>
-  </header>
+<html lang="sv">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>E-Paper WYSIWYG Layout Editor</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header>
+      <h1>E-Paper WYSIWYG Layout Editor</h1>
+      <p class="status">Klicka ett textobjekt för att redigera det.</p>
+    </header>
 
-  <main>
-    <svg id="canvas" width="296" height="128"></svg>
-  </main>
+    <main>
+      <section class="canvas-panel">
+        <svg id="canvas" width="296" height="128" viewBox="0 0 296 128"></svg>
+        <button id="add-text-btn" type="button">Lägg till text</button>
+      </section>
 
-  <script src="app.js"></script>
-</body>
+      <aside class="inspector">
+        <h2>Text-egenskaper</h2>
+        <div id="inspector-empty">Markera ett textobjekt för att redigera.</div>
+
+        <form id="text-form" hidden>
+          <label>
+            Text
+            <textarea id="text-input" rows="4"></textarea>
+          </label>
+
+          <label>
+            X
+            <input id="x-input" type="number" step="1" />
+          </label>
+
+          <label>
+            Y
+            <input id="y-input" type="number" step="1" />
+          </label>
+
+          <label>
+            Fontstorlek
+            <input id="font-size-input" type="number" min="6" max="72" step="1" />
+          </label>
+
+          <div class="inline-fields">
+            <label>
+              <input id="bold-input" type="checkbox" /> Fet
+            </label>
+            <label>
+              <input id="italic-input" type="checkbox" /> Kursiv
+            </label>
+          </div>
+
+          <label>
+            Justering
+            <select id="anchor-input">
+              <option value="start">Vänster</option>
+              <option value="middle">Centrerad</option>
+              <option value="end">Höger</option>
+            </select>
+          </label>
+
+          <button id="delete-text-btn" type="button" class="danger-button">Ta bort text</button>
+        </form>
+
+        <div class="export-panel">
+          <h3>Export</h3>
+          <button id="export-json-btn" type="button">Exportera JSON</button>
+          <button id="export-openepaperlink-btn" type="button">Exportera OpenEPaperLink</button>
+          <label>
+            Exportdata
+            <textarea id="export-output" readonly rows="8"></textarea>
+          </label>
+        </div>
+      </aside>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
 </html>

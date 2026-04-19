@@ -1,4 +1,25 @@
 const canvas = document.getElementById("canvas");
+const addTextButton = document.getElementById("add-text-btn");
+const textForm = document.getElementById("text-form");
+const inspectorEmpty = document.getElementById("inspector-empty");
+const textInput = document.getElementById("text-input");
+const xInput = document.getElementById("x-input");
+const yInput = document.getElementById("y-input");
+const fontSizeInput = document.getElementById("font-size-input");
+const anchorInput = document.getElementById("anchor-input");
+const boldInput = document.getElementById("bold-input");
+const italicInput = document.getElementById("italic-input");
+const exportJsonButton = document.getElementById("export-json-btn");
+const exportOpenEpaperLinkButton = document.getElementById("export-openepaperlink-btn");
+const exportOutput = document.getElementById("export-output");
+const deleteTextButton = document.getElementById("delete-text-btn");
+
+deleteTextButton.hidden = true;
+
+let selectedElementId = null;
+let dragging = false;
+let dragOffset = { x: 0, y: 0 };
+let nextElementId = 1;
 
 const layout = {
   width: 296,
@@ -6,33 +27,259 @@ const layout = {
   elements: []
 };
 
-function addText(x, y, text) {
-  const el = {
+function createTextElement(x, y, text) {
+  return {
+    id: nextElementId++,
     type: "text",
     x,
     y,
-    text
+    text,
+    fontSize: 16,
+    fontWeight: "normal",
+    fontStyle: "normal",
+    textAnchor: "start"
   };
+}
+
+function addText(x, y, text) {
+  const el = createTextElement(x, y, text);
   layout.elements.push(el);
+  selectElement(el.id);
   render();
+}
+
+function getSelectedElement() {
+  return layout.elements.find((el) => el.id === selectedElementId) || null;
+}
+
+function selectElement(id) {
+  selectedElementId = id;
+  updateInspector();
+  render();
+}
+
+function deselectElement() {
+  selectedElementId = null;
+  updateInspector();
+  render();
+}
+
+function updateInspector() {
+  const element = getSelectedElement();
+
+  if (!element) {
+    textForm.hidden = true;
+    inspectorEmpty.hidden = false;
+    return;
+  }
+
+  textForm.hidden = false;
+  inspectorEmpty.hidden = true;
+  deleteTextButton.hidden = false;
+  textInput.value = element.text;
+  xInput.value = element.x;
+  yInput.value = element.y;
+  fontSizeInput.value = element.fontSize;
+  boldInput.checked = element.fontWeight === "bold";
+  italicInput.checked = element.fontStyle === "italic";
+  anchorInput.value = element.textAnchor;
+}
+
+function updateSelectedElement() {
+  const element = getSelectedElement();
+  if (!element) return;
+
+  element.text = textInput.value;
+  element.x = Number(xInput.value);
+  element.y = Number(yInput.value);
+  element.fontSize = Number(fontSizeInput.value);
+  element.fontWeight = boldInput.checked ? "bold" : "normal";
+  element.fontStyle = italicInput.checked ? "italic" : "normal";
+  element.textAnchor = anchorInput.value;
+
+  render();
+}
+
+function deleteSelectedElement() {
+  if (selectedElementId === null) return;
+
+  const index = layout.elements.findIndex((el) => el.id === selectedElementId);
+  if (index === -1) return;
+
+  layout.elements.splice(index, 1);
+  selectedElementId = null;
+  updateInspector();
+  render();
+}
+
+function svgPoint(event) {
+  const point = canvas.createSVGPoint();
+  point.x = event.clientX;
+  point.y = event.clientY;
+  return point.matrixTransform(canvas.getScreenCTM().inverse());
+}
+
+function startDrag(element, event) {
+  const point = svgPoint(event);
+  dragOffset.x = point.x - element.x;
+  dragOffset.y = point.y - element.y;
+  dragging = true;
+}
+
+function stopDrag() {
+  dragging = false;
 }
 
 function render() {
   canvas.innerHTML = "";
 
   for (const el of layout.elements) {
-    if (el.type === "text") {
-      const textNode = document.createElementNS(
-        "http://www.w3.org/2000/svg",
-        "text"
-      );
-      textNode.setAttribute("x", el.x);
-      textNode.setAttribute("y", el.y);
-      textNode.textContent = el.text;
-      canvas.appendChild(textNode);
+    if (el.type !== "text") continue;
+
+    const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    const textNode = document.createElementNS("http://www.w3.org/2000/svg", "text");
+
+    textNode.setAttribute("x", el.x);
+    textNode.setAttribute("y", el.y);
+    textNode.setAttribute("font-size", el.fontSize);
+    textNode.setAttribute("font-weight", el.fontWeight);
+    textNode.setAttribute("font-style", el.fontStyle);
+    textNode.setAttribute("text-anchor", el.textAnchor);
+    textNode.setAttribute("xml:space", "preserve");
+    textNode.dataset.id = el.id;
+    textNode.classList.add("text-element");
+    if (el.id === selectedElementId) {
+      textNode.classList.add("selected");
     }
+
+    const lines = el.text.split("\n");
+    if (lines.length === 1) {
+      textNode.textContent = lines[0] || "\u200B";
+    } else {
+      lines.forEach((line, index) => {
+        const tspan = document.createElementNS("http://www.w3.org/2000/svg", "tspan");
+        tspan.setAttribute("x", el.x);
+        tspan.setAttribute("dy", index === 0 ? "0" : "1.2em");
+        tspan.textContent = line || "\u200B";
+        textNode.appendChild(tspan);
+      });
+    }
+
+    group.appendChild(textNode);
+    canvas.appendChild(group);
+
+    if (el.id === selectedElementId) {
+      const bbox = textNode.getBBox();
+      const paddingX = 6;
+      const paddingY = 4;
+      const selectionRect = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+      selectionRect.setAttribute("x", bbox.x - paddingX);
+      selectionRect.setAttribute("y", bbox.y - paddingY);
+      selectionRect.setAttribute("width", bbox.width + paddingX * 2);
+      selectionRect.setAttribute("height", bbox.height + paddingY * 2);
+      selectionRect.classList.add("selection-rect");
+      group.insertBefore(selectionRect, textNode);
+    }
+
+    textNode.addEventListener("mousedown", (event) => {
+      event.stopPropagation();
+      selectElement(el.id);
+      startDrag(el, event);
+    });
+
+    textNode.addEventListener("click", (event) => {
+      event.stopPropagation();
+      selectElement(el.id);
+    });
+
+    textNode.addEventListener("dblclick", (event) => {
+      event.stopPropagation();
+      selectElement(el.id);
+      textInput.focus();
+    });
   }
 }
 
-// test
+canvas.addEventListener("mousedown", (event) => {
+  if (event.target === canvas) {
+    deselectElement();
+  }
+});
+
+canvas.addEventListener("mousemove", (event) => {
+  if (!dragging) return;
+
+  const element = getSelectedElement();
+  if (!element) return;
+
+  const point = svgPoint(event);
+  element.x = point.x - dragOffset.x;
+  element.y = point.y - dragOffset.y;
+  updateInspector();
+  render();
+});
+
+window.addEventListener("mouseup", () => {
+  stopDrag();
+});
+
+function getEditorPayload() {
+  return {
+    width: layout.width,
+    height: layout.height,
+    elements: layout.elements.map((el) => ({ ...el }))
+  };
+}
+
+function getOpenEpaperLinkPayload() {
+  return {
+    width: layout.width,
+    height: layout.height,
+    objects: layout.elements.map((el) => ({
+      type: "text",
+      x: el.x,
+      y: el.y,
+      text: el.text,
+      fontSize: el.fontSize,
+      fontWeight: el.fontWeight,
+      fontStyle: el.fontStyle,
+      textAnchor: el.textAnchor
+    }))
+  };
+}
+
+function downloadJson(filename, payload) {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {
+    type: "application/json"
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+function exportJson() {
+  const payload = getEditorPayload();
+  exportOutput.value = JSON.stringify(payload, null, 2);
+  downloadJson("layout.json", payload);
+}
+
+function exportOpenEpaperLink() {
+  const payload = getOpenEpaperLinkPayload();
+  exportOutput.value = JSON.stringify(payload, null, 2);
+  downloadJson("openepaperlink.json", payload);
+}
+
+textForm.addEventListener("input", updateSelectedElement);
+deleteTextButton.addEventListener("click", deleteSelectedElement);
+addTextButton.addEventListener("click", () => {
+  addText(20, 40, "Ny text");
+});
+exportJsonButton.addEventListener("click", exportJson);
+exportOpenEpaperLinkButton.addEventListener("click", exportOpenEpaperLink);
+
 addText(10, 20, "Hello e-paper");
