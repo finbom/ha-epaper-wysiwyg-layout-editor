@@ -47,8 +47,6 @@ svg#canvas {
   background: white;
   border: 1px solid #333;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  width: 296px;
-  height: 128px;
 }
 
 button {
