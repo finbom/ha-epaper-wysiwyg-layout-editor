@@ -9,6 +9,9 @@ const fontSizeInput = document.getElementById("font-size-input");
 const anchorInput = document.getElementById("anchor-input");
 const boldInput = document.getElementById("bold-input");
 const italicInput = document.getElementById("italic-input");
+const sourceTypeInput = document.getElementById("source-type-input");
+const entityInput = document.getElementById("entity-input");
+const entityLabel = document.getElementById("entity-label");
 const exportJsonButton = document.getElementById("export-json-btn");
 const exportOpenEpaperLinkButton = document.getElementById("export-openepaperlink-btn");
 const exportOutput = document.getElementById("export-output");
@@ -24,6 +27,51 @@ const presets = {
   "384x168": { width: 384, height: 168 },
   "400x300": { width: 400, height: 300 }
 };
+
+// add a simple mock Home Assistant entity state provider for development mode
+const mockHAEntities = {
+  "sensor.living_room_temperature": {
+    state: "22.5",
+    attributes: {
+      unit_of_measurement: "°C",
+      friendly_name: "Living Room Temperature"
+    }
+  },
+  "sensor.outdoor_temperature": {
+    state: "18.3",
+    attributes: {
+      unit_of_measurement: "°C",
+      friendly_name: "Outdoor Temperature"
+    }
+  },
+  "binary_sensor.front_door": {
+    state: "off",
+    attributes: {
+      friendly_name: "Front Door"
+    }
+  },
+  "light.living_room": {
+    state: "on",
+    attributes: {
+      friendly_name: "Living Room Light",
+      brightness: 255
+    }
+  }
+};
+
+function getEntityState(entityId) {
+  return mockHAEntities[entityId]?.state ?? null;
+}
+
+function populateEntityOptions() {
+  entityInput.innerHTML = "";
+  for (const entityId in mockHAEntities) {
+    const option = document.createElement("option");
+    option.value = entityId;
+    option.textContent = `${mockHAEntities[entityId].attributes.friendly_name} (${entityId})`;
+    entityInput.appendChild(option);
+  }
+}
 
 deleteTextButton.hidden = true;
 
@@ -45,6 +93,13 @@ function createTextElement(x, y, text) {
     x,
     y,
     text,
+
+    // NEW: where the text comes from
+    source: {
+      type: "static",   // "static" | "entity"
+      entity_id: null
+    },
+
     fontSize: 16,
     fontWeight: "normal",
     fontStyle: "normal",
@@ -75,6 +130,8 @@ function deselectElement() {
   render();
 }
 
+
+
 function updateInspector() {
   const element = getSelectedElement();
 
@@ -88,19 +145,30 @@ function updateInspector() {
   inspectorEmpty.hidden = true;
   deleteTextButton.hidden = false;
   textInput.value = element.text;
+  textInput.readOnly = element.source.type === "entity";
   xInput.value = element.x;
   yInput.value = element.y;
   fontSizeInput.value = element.fontSize;
   boldInput.checked = element.fontWeight === "bold";
   italicInput.checked = element.fontStyle === "italic";
   anchorInput.value = element.textAnchor;
+  sourceTypeInput.value = element.source.type;
+  if (element.source.type === "entity") {
+    entityLabel.hidden = false;
+    populateEntityOptions();
+    entityInput.value = element.source.entity_id;
+  } else {
+    entityLabel.hidden = true;
+  }
 }
 
 function updateSelectedElement() {
   const element = getSelectedElement();
   if (!element) return;
 
-  element.text = textInput.value;
+  if (element.source.type !== "entity") {
+    element.text = textInput.value;
+  }
   element.x = Math.round(Number(xInput.value));
   element.y = Math.round(Number(yInput.value));
   element.fontSize = Number(fontSizeInput.value);
@@ -163,18 +231,29 @@ function render() {
       textNode.classList.add("selected");
     }
 
-    const lines = el.text.split("\n");
-    if (lines.length === 1) {
-      textNode.textContent = lines[0] || "\u200B";
-    } else {
-      lines.forEach((line, index) => {
-        const tspan = document.createElementNS("http://www.w3.org/2000/svg", "tspan");
-        tspan.setAttribute("x", el.x);
-        tspan.setAttribute("dy", index === 0 ? "0" : "1.2em");
-        tspan.textContent = line || "\u200B";
-        textNode.appendChild(tspan);
-      });
-    }
+// Determine what text to display (static or entity-backed)
+const rawText =
+  el.source?.type === "entity" && el.source.entity_id
+    ? getEntityState(el.source.entity_id) ?? "?"
+    : el.text;
+
+// Split text into lines (supports multi-line text)
+const lines = String(rawText).split("\n");
+
+  if (lines.length === 1) {
+    textNode.textContent = lines[0] || "\u200B";
+  } else {
+    lines.forEach((line, index) => {
+      const tspan = document.createElementNS(
+        "http://www.w3.org/2000/svg",
+        "tspan"
+      );
+      tspan.setAttribute("x", el.x);
+      tspan.setAttribute("dy", index === 0 ? "0" : "1.2em");
+      tspan.textContent = line || "\u200B";
+      textNode.appendChild(tspan);
+    });
+  }
 
     group.appendChild(textNode);
     canvas.appendChild(group);
@@ -293,6 +372,39 @@ addTextButton.addEventListener("click", () => {
 exportJsonButton.addEventListener("click", exportJson);
 exportOpenEpaperLinkButton.addEventListener("click", exportOpenEpaperLink);
 
+sourceTypeInput.addEventListener("change", () => {
+  const element = getSelectedElement();
+  if (!element) return;
+
+  element.source.type = sourceTypeInput.value;
+
+  if (element.source.type === "entity") {
+    entityLabel.hidden = false;
+    populateEntityOptions();
+
+    if (!element.source.entity_id) {
+      element.source.entity_id = Object.keys(mockHAEntities)[0];
+    }
+
+    entityInput.value = element.source.entity_id;
+  } else {
+    entityLabel.hidden = true;
+  }
+
+  updateInspector();
+  render(); // ✅ VIKTIGAST
+});
+
+entityInput.addEventListener("change", () => {
+  const element = getSelectedElement();
+  if (!element) return;
+
+  element.source.entity_id = entityInput.value;
+
+  updateInspector();
+  render(); // ✅ VIKTIGAST
+});
+
 function applySizeChange() {
   const newWidth = Math.max(1, Math.min(10000, Number(widthInput.value)));
   const newHeight = Math.max(1, Math.min(10000, Number(heightInput.value)));
@@ -321,3 +433,11 @@ setSizeButton.addEventListener("click", (e) => {
 });
 
 addText(50, 50, "Hello e-paper");
+
+// DEV ONLY: test entity-backed text rendering
+addText(50, 50, "");
+layout.elements[0].source = {
+  type: "entity",
+  entity_id: "sensor.outdoor_temperature"
+};
+render();
