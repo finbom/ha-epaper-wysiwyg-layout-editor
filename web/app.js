@@ -439,10 +439,3 @@ setSizeButton.addEventListener("click", (e) => {
 
 addText(50, 50, "Hello e-paper");
 
-// DEV ONLY: test entity-backed text rendering
-addText(50, 50, "");
-layout.elements[0].source = {
-  type: "entity",
-  entity_id: "sensor.outdoor_temperature"
-};
-render();
