@@ -1,1 +1,12 @@
+name: "E-Paper WYSIWYG"
 slug: e_paper_wysiwyg
+description: "WYSIWYG layout editor for e-paper dashboards"
+version: "0.0.1"
+startup: services
+boot: auto
+arch:
+  - amd64
+  - aarch64
+  - armv7
+options: {}
+schema: {}
