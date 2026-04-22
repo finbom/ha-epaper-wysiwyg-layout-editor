@@ -413,6 +413,11 @@ function applySizeChange() {
   canvas.setAttribute("width", newWidth);
   canvas.setAttribute("height", newHeight);
   canvas.setAttribute("viewBox", `0 0 ${newWidth} ${newHeight}`);
+  // Scale the canvas display size proportionally, capping width at 500px
+  const maxDisplayWidth = 500;
+  const scale = Math.min(maxDisplayWidth / newWidth, 1);
+  canvas.style.width = (newWidth * scale) + 'px';
+  canvas.style.height = (newHeight * scale) + 'px';
   render();
 }
 
