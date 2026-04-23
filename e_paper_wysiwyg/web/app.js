@@ -62,103 +62,29 @@ const mockHAEntities = {
 // Cache for live entity states from Home Assistant
 const haStateCache = {};
 const haEntities = {};  // Full entity objects (for dropdown labels)
-let haConnection = null;
-let haConnectionAttempted = false;
-let haMessageId = 1;
-
-// Check if running inside Home Assistant (Ingress)
-function isInsideHA() {
-  return window.location.pathname.startsWith("/api/hassio_ingress/") || 
-         window.location.hostname === "localhost" && window.location.port === "8123";
-}
 
 // Get entity state from cache (HA), fallback to mock data
 function getEntityState(entityId) {
-  // Check live HA cache first
   if (haStateCache[entityId] !== undefined) {
     return haStateCache[entityId];
   }
-  // Fallback to mock data for development
   return mockHAEntities[entityId]?.state ?? null;
 }
 
-// Handle incoming WebSocket messages from Home Assistant
-function handleHAMessage(message) {
-  if (message.type === "auth_required") {
-    const hassTokens = JSON.parse(localStorage.getItem("hassTokens") || "null");
-    const token = hassTokens?.access_token;
-    if (token) {
-      haConnection.send(JSON.stringify({ type: "auth", access_token: token }));
-    } else {
-      console.warn("HA auth token not found in localStorage — falling back to mock data");
-    }
-  } else if (message.type === "auth_ok") {
-    console.log("Connected to Home Assistant");
-    haConnection.send(JSON.stringify({ id: haMessageId++, type: "get_states" }));
-    haConnection.send(JSON.stringify({ id: haMessageId++, type: "subscribe_events", event_type: "state_changed" }));
-  } else if (message.type === "result" && message.success) {
-    if (Array.isArray(message.result)) {
-      message.result.forEach((stateObj) => {
-        if (stateObj.entity_id) {
-          haStateCache[stateObj.entity_id] = stateObj.state;
-          haEntities[stateObj.entity_id] = stateObj;
-        }
-      });
-      console.log("Loaded", Object.keys(haStateCache).length, "entity states from HA");
-      render();
-    }
-  } else if (message.type === "event" && message.event?.event_type === "state_changed") {
-    const entityId = message.event.data?.entity_id;
-    const newState = message.event.data?.new_state;
-    if (entityId && newState !== undefined) {
-      haStateCache[entityId] = newState.state;
-      haEntities[entityId] = newState;
-      render();
-    }
-  }
-}
-
-// Connect to Home Assistant WebSocket
-function connectToHA() {
-  if (haConnectionAttempted) return;
-  haConnectionAttempted = true;
-
-  if (!isInsideHA()) {
-    console.log("Not running in Home Assistant, using mock data");
-    return;
-  }
-
+// Fetch entity states from the local backend proxy (uses Supervisor token server-side)
+async function fetchHAStates() {
   try {
-    const protocol = window.location.protocol === "https:" ? "wss" : "ws";
-    const wsUrl = `${protocol}://${window.location.host}/api/websocket`;
-    console.log("Connecting to Home Assistant at", wsUrl);
-    
-    haConnection = new WebSocket(wsUrl);
-    
-    haConnection.onopen = () => {
-      console.log("WebSocket connected");
-    };
-    
-    haConnection.onmessage = (event) => {
-      try {
-        const message = JSON.parse(event.data);
-        handleHAMessage(message);
-      } catch (e) {
-        console.error("Error parsing HA message:", e);
-      }
-    };
-    
-    haConnection.onerror = (error) => {
-      console.log("WebSocket error, using mock data:", error);
-      haConnection = null;
-    };
-    
-    haConnection.onclose = () => {
-      console.log("WebSocket closed");
-      haConnection = null;
-    };
-  } catch (error) {
-    console.log("Failed to connect to HA, using mock data:", error);
+    const resp = await fetch("ha-states");
+    if (!resp.ok) return;
+    const states = await resp.json();
+    states.forEach((s) => {
+      haStateCache[s.entity_id] = s.state;
+      haEntities[s.entity_id] = s;
+    });
+    console.log("Loaded", states.length, "entity states from HA");
+    render();
+  } catch {
+    console.log("HA states unavailable, using mock data");
   }
 }
 
@@ -539,8 +465,8 @@ setSizeButton.addEventListener("click", (e) => {
   }
 });
 
-// Initialize Home Assistant connection if available
-connectToHA();
+// Load entity states from HA (falls back to mock data if unavailable)
+fetchHAStates();
 
 // Add test element
 addText(50, 50, "Hello e-paper");
