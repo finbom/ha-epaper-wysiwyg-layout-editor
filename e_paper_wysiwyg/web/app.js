@@ -74,8 +74,15 @@ function getEntityState(entityId) {
 // Fetch entity states from the local backend proxy (uses Supervisor token server-side)
 async function fetchHAStates() {
   try {
-    const resp = await fetch("ha-states");
-    if (!resp.ok) return;
+    // Build URL relative to current directory, handling missing trailing slash
+    const base = window.location.href.replace(/\/?(\?.*)?$/, "/");
+    const url = base + "ha-states";
+    console.log("Fetching HA states from", url);
+    const resp = await fetch(url);
+    if (!resp.ok) {
+      console.warn("ha-states returned", resp.status);
+      return;
+    }
     const states = await resp.json();
     states.forEach((s) => {
       haStateCache[s.entity_id] = s.state;
