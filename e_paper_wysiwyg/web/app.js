@@ -228,9 +228,9 @@ function updateInspector() {
   sourceTypeInput.value = element.source.type;
   if (element.source.type === "entity") {
     entityLabel.hidden = false;
-    entitySearch.value = "";
     populateEntityOptions();
     entityInput.value = element.source.entity_id;
+    closeEntityDropdown();
   } else {
     entityLabel.hidden = true;
   }
@@ -482,6 +482,43 @@ sourceTypeInput.addEventListener("change", () => {
   render(); // ✅ VIKTIGAST
 });
 
+function openEntityDropdown() {
+  entityLabel.classList.add("entity-open");
+}
+
+function closeEntityDropdown() {
+  entityLabel.classList.remove("entity-open");
+  const element = getSelectedElement();
+  if (element?.source?.entity_id) {
+    const source = Object.keys(haEntities).length > 0 ? haEntities : mockHAEntities;
+    const entity = source[element.source.entity_id];
+    entitySearch.value = entity?.attributes?.friendly_name || element.source.entity_id;
+  } else {
+    entitySearch.value = "";
+  }
+}
+
+function handleEntityBlur() {
+  setTimeout(() => {
+    if (document.activeElement !== entitySearch && document.activeElement !== entityInput) {
+      closeEntityDropdown();
+    }
+  }, 150);
+}
+
+entitySearch.addEventListener("focus", () => {
+  entitySearch.value = "";
+  populateEntityOptions();
+  const element = getSelectedElement();
+  if (element?.source?.entity_id) {
+    entityInput.value = element.source.entity_id;
+  }
+  openEntityDropdown();
+});
+
+entitySearch.addEventListener("blur", handleEntityBlur);
+entityInput.addEventListener("blur", handleEntityBlur);
+
 entitySearch.addEventListener("input", () => {
   const element = getSelectedElement();
   populateEntityOptions(entitySearch.value);
@@ -516,7 +553,8 @@ entitySearch.addEventListener("keydown", (e) => {
     if (!element || !entityInput.value) return;
     uiLog(`entity selected via keyboard → ${entityInput.value} (element id=${element.id})`);
     element.source.entity_id = entityInput.value;
-    updateInspector();
+    entitySearch.blur();
+    closeEntityDropdown();
     render();
   }
 });
@@ -527,8 +565,7 @@ entityInput.addEventListener("change", () => {
 
   uiLog(`entity changed → ${entityInput.value} (element id=${element.id})`);
   element.source.entity_id = entityInput.value;
-
-  updateInspector();
+  closeEntityDropdown();
   render();
 });
 

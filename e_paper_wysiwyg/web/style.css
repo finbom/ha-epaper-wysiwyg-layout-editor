@@ -142,19 +142,29 @@ textarea {
 }
 
 #entity-search {
-  margin-bottom: 4px;
-  border-radius: 10px 10px 0 0;
-  border-bottom: none;
+  border-radius: 10px;
 }
 
 #entity-input[size] {
+  display: none;
   border-radius: 0 0 10px 10px;
+  border-top: none;
   height: auto;
   padding: 4px 0;
+  margin-top: -1px;
 }
 
 #entity-input[size] option {
   padding: 5px 10px;
+}
+
+#entity-label.entity-open #entity-search {
+  border-radius: 10px 10px 0 0;
+  border-bottom-color: transparent;
+}
+
+#entity-label.entity-open #entity-input[size] {
+  display: block;
 }
 
 #inspector-empty {
