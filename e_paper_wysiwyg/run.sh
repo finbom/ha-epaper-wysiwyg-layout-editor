@@ -26,13 +26,17 @@ def vlog(msg):
 
 print(f"[server] Starting on port {PORT}", flush=True)
 print(f"[server] SUPERVISOR_TOKEN present: {bool(SUPERVISOR_TOKEN)}", flush=True)
-print(f"[server] Verbose logging: {VERBOSE}", flush=True)
+if VERBOSE:
+    print("*** VERBOSE LOGGING IS ACTIVE ***", flush=True)
+else:
+    print(f"[server] Verbose logging: False", flush=True)
 
 
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         path = self.path.split("?")[0]
-        vlog(f"[req] GET {self.path} from {self.client_address[0]}")
+        print(f"[req] GET {path}", flush=True)  # always log every request
+        vlog(f"[req] full: {self.path} from {self.client_address[0]}")
         if path == "/ha-states":
             self._serve_ha_states()
         elif path == "/addon-config":
@@ -47,7 +51,7 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             return
         try:
-            vlog("[ha-states] Fetching from supervisor...")
+            print("[ha-states] Fetching from supervisor...", flush=True)
             req = urllib.request.Request(
                 "http://supervisor/core/api/states",
                 headers={
@@ -73,7 +77,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _serve_addon_config(self):
         payload = json.dumps({"verbose_logging": VERBOSE}).encode()
-        vlog(f"[addon-config] Serving config: verbose_logging={VERBOSE}")
+        vlog(f"[addon-config] verbose_logging={VERBOSE}")
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.end_headers()
@@ -87,9 +91,9 @@ class Handler(BaseHTTPRequestHandler):
             with open(WEB_DIR + path, "rb") as f:
                 data = f.read()
             mime = mimetypes.guess_type(path)[0] or "application/octet-stream"
-            vlog(f"[static] 200 {path}")
             self.send_response(200)
             self.send_header("Content-Type", mime)
+            self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
             self.end_headers()
             self.wfile.write(data)
         except FileNotFoundError:
