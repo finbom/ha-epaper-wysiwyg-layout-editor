@@ -61,8 +61,10 @@ const mockHAEntities = {
 
 // Cache for live entity states from Home Assistant
 const haStateCache = {};
+const haEntities = {};  // Full entity objects (for dropdown labels)
 let haConnection = null;
 let haConnectionAttempted = false;
+let haMessageId = 1;
 
 // Check if running inside Home Assistant (Ingress)
 function isInsideHA() {
@@ -82,27 +84,35 @@ function getEntityState(entityId) {
 
 // Handle incoming WebSocket messages from Home Assistant
 function handleHAMessage(message) {
-  if (message.type === "auth_ok") {
+  if (message.type === "auth_required") {
+    const hassTokens = JSON.parse(localStorage.getItem("hassTokens") || "null");
+    const token = hassTokens?.access_token;
+    if (token) {
+      haConnection.send(JSON.stringify({ type: "auth", access_token: token }));
+    } else {
+      console.warn("HA auth token not found in localStorage — falling back to mock data");
+    }
+  } else if (message.type === "auth_ok") {
     console.log("Connected to Home Assistant");
-    // Request all states
-    haConnection.send(JSON.stringify({ type: "get_states" }));
+    haConnection.send(JSON.stringify({ id: haMessageId++, type: "get_states" }));
+    haConnection.send(JSON.stringify({ id: haMessageId++, type: "subscribe_events", event_type: "state_changed" }));
   } else if (message.type === "result" && message.success) {
-    // States response
     if (Array.isArray(message.result)) {
       message.result.forEach((stateObj) => {
         if (stateObj.entity_id) {
           haStateCache[stateObj.entity_id] = stateObj.state;
+          haEntities[stateObj.entity_id] = stateObj;
         }
       });
       console.log("Loaded", Object.keys(haStateCache).length, "entity states from HA");
       render();
     }
   } else if (message.type === "event" && message.event?.event_type === "state_changed") {
-    // Handle state change events
     const entityId = message.event.data?.entity_id;
-    const newState = message.event.data?.new_state?.state;
+    const newState = message.event.data?.new_state;
     if (entityId && newState !== undefined) {
-      haStateCache[entityId] = newState;
+      haStateCache[entityId] = newState.state;
+      haEntities[entityId] = newState;
       render();
     }
   }
@@ -154,10 +164,12 @@ function connectToHA() {
 
 function populateEntityOptions() {
   entityInput.innerHTML = "";
-  for (const entityId in mockHAEntities) {
+  const source = Object.keys(haEntities).length > 0 ? haEntities : mockHAEntities;
+  for (const entityId in source) {
     const option = document.createElement("option");
     option.value = entityId;
-    option.textContent = `${mockHAEntities[entityId].attributes.friendly_name} (${entityId})`;
+    const friendlyName = source[entityId].attributes?.friendly_name || entityId;
+    option.textContent = `${friendlyName} (${entityId})`;
     entityInput.appendChild(option);
   }
 }
@@ -472,7 +484,8 @@ sourceTypeInput.addEventListener("change", () => {
     populateEntityOptions();
 
     if (!element.source.entity_id) {
-      element.source.entity_id = Object.keys(mockHAEntities)[0];
+      const source = Object.keys(haEntities).length > 0 ? haEntities : mockHAEntities;
+      element.source.entity_id = Object.keys(source)[0];
     }
 
     entityInput.value = element.source.entity_id;
