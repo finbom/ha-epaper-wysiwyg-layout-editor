@@ -490,6 +490,37 @@ entitySearch.addEventListener("input", () => {
   }
 });
 
+entitySearch.addEventListener("keydown", (e) => {
+  const opts = entityInput.options;
+  if (opts.length === 0) return;
+
+  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    e.preventDefault();
+    let idx = entityInput.selectedIndex;
+    if (e.key === "ArrowDown") {
+      idx = idx < opts.length - 1 ? idx + 1 : 0;
+    } else {
+      idx = idx > 0 ? idx - 1 : opts.length - 1;
+    }
+    entityInput.selectedIndex = idx;
+    opts[idx].scrollIntoView({ block: "nearest" });
+
+    const element = getSelectedElement();
+    if (element) {
+      element.source.entity_id = entityInput.value;
+      render();
+    }
+  } else if (e.key === "Enter") {
+    e.preventDefault();
+    const element = getSelectedElement();
+    if (!element || !entityInput.value) return;
+    uiLog(`entity selected via keyboard → ${entityInput.value} (element id=${element.id})`);
+    element.source.entity_id = entityInput.value;
+    updateInspector();
+    render();
+  }
+});
+
 entityInput.addEventListener("change", () => {
   const element = getSelectedElement();
   if (!element) return;
@@ -498,7 +529,7 @@ entityInput.addEventListener("change", () => {
   element.source.entity_id = entityInput.value;
 
   updateInspector();
-  render(); // ✅ VIKTIGAST
+  render();
 });
 
 function applySizeChange() {
