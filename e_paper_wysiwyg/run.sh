@@ -6,12 +6,12 @@ echo "SUPERVISOR_TOKEN present: $([ -n "$SUPERVISOR_TOKEN" ] && echo yes || echo
 exec python3 2>&1 - << 'PYEOF'
 import os, json, mimetypes, urllib.request, urllib.error
 from http.server import HTTPServer, BaseHTTPRequestHandler
+from datetime import datetime
 
 SUPERVISOR_TOKEN = os.environ.get("SUPERVISOR_TOKEN", "")
 WEB_DIR = "/web"
 PORT = 8099
 
-# Read addon options written by HA Supervisor to /data/options.json
 try:
     with open("/data/options.json") as f:
         OPTIONS = json.load(f)
@@ -20,23 +20,28 @@ except Exception:
 
 VERBOSE = OPTIONS.get("verbose_logging", False)
 
+def ts():
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+def log(msg):
+    print(f"{ts()} {msg}", flush=True)
+
 def vlog(msg):
     if VERBOSE:
-        print(msg, flush=True)
+        log(msg)
 
-print(f"[server] Starting on port {PORT}", flush=True)
-print(f"[server] SUPERVISOR_TOKEN present: {bool(SUPERVISOR_TOKEN)}", flush=True)
+log(f"[server] Starting on port {PORT}")
+log(f"[server] SUPERVISOR_TOKEN present: {bool(SUPERVISOR_TOKEN)}")
 if VERBOSE:
-    print("*** VERBOSE LOGGING IS ACTIVE ***", flush=True)
+    log("*** VERBOSE LOGGING IS ACTIVE ***")
 else:
-    print(f"[server] Verbose logging: False", flush=True)
+    log("[server] Verbose logging: False")
 
 
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         path = self.path.split("?")[0]
-        print(f"[req] GET {path}", flush=True)  # always log every request
-        vlog(f"[req] full: {self.path} from {self.client_address[0]}")
+        log(f"[req] GET {path}")
         if path == "/ha-states":
             self._serve_ha_states()
         elif path == "/addon-config":
@@ -44,14 +49,33 @@ class Handler(BaseHTTPRequestHandler):
         else:
             self._serve_static()
 
+    def do_POST(self):
+        path = self.path.split("?")[0]
+        if path == "/log":
+            self._handle_ui_log()
+        else:
+            self.send_response(404)
+            self.end_headers()
+
+    def _handle_ui_log(self):
+        length = int(self.headers.get("Content-Length", 0))
+        body = self.rfile.read(length).decode("utf-8", errors="replace") if length else ""
+        try:
+            msg = json.loads(body).get("msg", body)
+        except Exception:
+            msg = body
+        log(f"[ui] {msg}")
+        self.send_response(204)
+        self.end_headers()
+
     def _serve_ha_states(self):
         if not SUPERVISOR_TOKEN:
-            print("[ha-states] ERROR: SUPERVISOR_TOKEN is not set", flush=True)
+            log("[ha-states] ERROR: SUPERVISOR_TOKEN is not set")
             self.send_response(503)
             self.end_headers()
             return
         try:
-            print("[ha-states] Fetching from supervisor...", flush=True)
+            log("[ha-states] Fetching from supervisor...")
             req = urllib.request.Request(
                 "http://supervisor/core/api/states",
                 headers={
@@ -61,17 +85,17 @@ class Handler(BaseHTTPRequestHandler):
             )
             with urllib.request.urlopen(req, timeout=10) as resp:
                 data = resp.read()
-            print(f"[ha-states] OK — {len(data)} bytes", flush=True)
+            log(f"[ha-states] OK — {len(data)} bytes")
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.end_headers()
             self.wfile.write(data)
         except urllib.error.HTTPError as e:
-            print(f"[ha-states] HTTP error {e.code}: {e.reason}", flush=True)
+            log(f"[ha-states] HTTP error {e.code}: {e.reason}")
             self.send_response(502)
             self.end_headers()
         except Exception as e:
-            print(f"[ha-states] ERROR: {e}", flush=True)
+            log(f"[ha-states] ERROR: {e}")
             self.send_response(502)
             self.end_headers()
 
@@ -91,13 +115,14 @@ class Handler(BaseHTTPRequestHandler):
             with open(WEB_DIR + path, "rb") as f:
                 data = f.read()
             mime = mimetypes.guess_type(path)[0] or "application/octet-stream"
+            vlog(f"[static] 200 {path}")
             self.send_response(200)
             self.send_header("Content-Type", mime)
             self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
             self.end_headers()
             self.wfile.write(data)
         except FileNotFoundError:
-            print(f"[static] 404 {path}", flush=True)
+            log(f"[static] 404 {path}")
             self.send_response(404)
             self.end_headers()
 

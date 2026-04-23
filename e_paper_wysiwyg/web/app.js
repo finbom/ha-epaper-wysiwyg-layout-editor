@@ -63,15 +63,30 @@ const mockHAEntities = {
 const haStateCache = {};
 const haEntities = {};  // Full entity objects (for dropdown labels)
 let VERBOSE = false;
+let addonBase = null;
+
+function getBase() {
+  if (!addonBase) addonBase = window.location.href.replace(/\/?(\?.*)?$/, "/");
+  return addonBase;
+}
 
 function vlog(...args) {
   if (VERBOSE) console.log("[verbose]", ...args);
 }
 
+function uiLog(msg) {
+  if (!VERBOSE) return;
+  console.log("[ui]", msg);
+  fetch(getBase() + "log", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ msg })
+  }).catch(() => {});
+}
+
 async function loadAddonConfig() {
   try {
-    const base = window.location.href.replace(/\/?(\?.*)?$/, "/");
-    const resp = await fetch(base + "addon-config");
+    const resp = await fetch(getBase() + "addon-config");
     if (!resp.ok) return;
     const cfg = await resp.json();
     VERBOSE = cfg.verbose_logging === true;
@@ -171,14 +186,14 @@ function getSelectedElement() {
 }
 
 function selectElement(id) {
-  vlog("selectElement", id);
+  uiLog(`selectElement id=${id}`);
   selectedElementId = id;
   updateInspector();
   render();
 }
 
 function deselectElement() {
-  vlog("deselectElement");
+  uiLog("deselectElement");
   selectedElementId = null;
   updateInspector();
   render();
@@ -239,7 +254,7 @@ function deleteSelectedElement() {
   const index = layout.elements.findIndex((el) => el.id === selectedElementId);
   if (index === -1) return;
 
-  vlog("deleteElement", selectedElementId);
+  uiLog(`deleteElement id=${selectedElementId}`);
   layout.elements.splice(index, 1);
   selectedElementId = null;
   updateInspector();
@@ -420,18 +435,28 @@ function exportOpenEpaperLink() {
 }
 
 textForm.addEventListener("input", updateSelectedElement);
-deleteTextButton.addEventListener("click", deleteSelectedElement);
+deleteTextButton.addEventListener("click", () => {
+  uiLog(`deleteText clicked (element id=${selectedElementId})`);
+  deleteSelectedElement();
+});
 addTextButton.addEventListener("click", () => {
+  uiLog("addText clicked");
   addText(50, 50, "New Text");
 });
-exportJsonButton.addEventListener("click", exportJson);
-exportOpenEpaperLinkButton.addEventListener("click", exportOpenEpaperLink);
+exportJsonButton.addEventListener("click", () => {
+  uiLog("exportJson clicked");
+  exportJson();
+});
+exportOpenEpaperLinkButton.addEventListener("click", () => {
+  uiLog("exportOpenEpaperLink clicked");
+  exportOpenEpaperLink();
+});
 
 sourceTypeInput.addEventListener("change", () => {
   const element = getSelectedElement();
   if (!element) return;
 
-  vlog("sourceType changed →", sourceTypeInput.value, "element", element.id);
+  uiLog(`sourceType changed → ${sourceTypeInput.value} (element id=${element.id})`);
   element.source.type = sourceTypeInput.value;
 
   if (element.source.type === "entity") {
@@ -456,7 +481,7 @@ entityInput.addEventListener("change", () => {
   const element = getSelectedElement();
   if (!element) return;
 
-  vlog("entity changed →", entityInput.value, "element", element.id);
+  uiLog(`entity changed → ${entityInput.value} (element id=${element.id})`);
   element.source.entity_id = entityInput.value;
 
   updateInspector();
@@ -481,6 +506,7 @@ function applySizeChange() {
 
 presetSelect.addEventListener("change", () => {
   const selectedPreset = presetSelect.value;
+  uiLog(`preset changed → ${selectedPreset}`);
   if (selectedPreset !== "custom" && presets[selectedPreset]) {
     const { width, height } = presets[selectedPreset];
     widthInput.value = width;
@@ -490,6 +516,7 @@ presetSelect.addEventListener("change", () => {
 
 setSizeButton.addEventListener("click", (e) => {
   e.preventDefault();
+  uiLog(`setSizeButton clicked (${widthInput.value}x${heightInput.value})`);
   if (confirm("Are you sure you want to change format?")) {
     applySizeChange();
   }
