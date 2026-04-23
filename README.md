@@ -1,4 +1,8 @@
+<p align="center">
+  <img src="assets/logo.png" alt="Logo" width="300"/>
+</p>
 # STILL IN ALPHA! 
+
 # E-Paper WYSIWYG Layout Editor
 
 A **Home Assistant Add-on** that provides a **WYSIWYG editor** for designing layouts for **e‑paper displays**, primarily for use with **OpenEPaperLink**.
