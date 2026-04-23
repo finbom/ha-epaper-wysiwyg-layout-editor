@@ -4,7 +4,7 @@ echo "Python: $(python3 --version 2>&1)"
 echo "SUPERVISOR_TOKEN present: $([ -n "$SUPERVISOR_TOKEN" ] && echo yes || echo NO)"
 
 exec python3 2>&1 - << 'PYEOF'
-import os, json, mimetypes, urllib.request, urllib.error
+import os, json, mimetypes, urllib.request, urllib.error, hashlib
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from datetime import datetime
 
@@ -114,11 +114,18 @@ class Handler(BaseHTTPRequestHandler):
         try:
             with open(WEB_DIR + path, "rb") as f:
                 data = f.read()
+            etag = hashlib.md5(data).hexdigest()
+            if self.headers.get("If-None-Match") == etag:
+                vlog(f"[static] 304 {path} (not modified)")
+                self.send_response(304)
+                self.end_headers()
+                return
             mime = mimetypes.guess_type(path)[0] or "application/octet-stream"
-            vlog(f"[static] 200 {path}")
+            vlog(f"[static] 200 {path} etag={etag[:8]}")
             self.send_response(200)
             self.send_header("Content-Type", mime)
-            self.send_header("Cache-Control", "no-cache, no-store, must-revalidate")
+            self.send_header("Cache-Control", "no-cache")
+            self.send_header("ETag", etag)
             self.end_headers()
             self.wfile.write(data)
         except FileNotFoundError:
