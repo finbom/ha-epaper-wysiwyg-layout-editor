@@ -4,20 +4,39 @@ echo "Python: $(python3 --version 2>&1)"
 echo "SUPERVISOR_TOKEN present: $([ -n "$SUPERVISOR_TOKEN" ] && echo yes || echo NO)"
 
 exec python3 2>&1 - << 'PYEOF'
-import os, mimetypes, urllib.request, urllib.error, sys
+import os, json, mimetypes, urllib.request, urllib.error
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 SUPERVISOR_TOKEN = os.environ.get("SUPERVISOR_TOKEN", "")
 WEB_DIR = "/web"
 PORT = 8099
 
+# Read addon options written by HA Supervisor to /data/options.json
+try:
+    with open("/data/options.json") as f:
+        OPTIONS = json.load(f)
+except Exception:
+    OPTIONS = {}
+
+VERBOSE = OPTIONS.get("verbose_logging", False)
+
+def vlog(msg):
+    if VERBOSE:
+        print(msg, flush=True)
+
 print(f"[server] Starting on port {PORT}", flush=True)
 print(f"[server] SUPERVISOR_TOKEN present: {bool(SUPERVISOR_TOKEN)}", flush=True)
+print(f"[server] Verbose logging: {VERBOSE}", flush=True)
+
 
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
-        if self.path.split("?")[0] == "/ha-states":
+        path = self.path.split("?")[0]
+        vlog(f"[req] GET {self.path} from {self.client_address[0]}")
+        if path == "/ha-states":
             self._serve_ha_states()
+        elif path == "/addon-config":
+            self._serve_addon_config()
         else:
             self._serve_static()
 
@@ -28,7 +47,7 @@ class Handler(BaseHTTPRequestHandler):
             self.end_headers()
             return
         try:
-            print("[ha-states] Fetching from supervisor...", flush=True)
+            vlog("[ha-states] Fetching from supervisor...")
             req = urllib.request.Request(
                 "http://supervisor/core/api/states",
                 headers={
@@ -52,6 +71,14 @@ class Handler(BaseHTTPRequestHandler):
             self.send_response(502)
             self.end_headers()
 
+    def _serve_addon_config(self):
+        payload = json.dumps({"verbose_logging": VERBOSE}).encode()
+        vlog(f"[addon-config] Serving config: verbose_logging={VERBOSE}")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        self.wfile.write(payload)
+
     def _serve_static(self):
         path = self.path.split("?")[0]
         if path == "/":
@@ -60,16 +87,19 @@ class Handler(BaseHTTPRequestHandler):
             with open(WEB_DIR + path, "rb") as f:
                 data = f.read()
             mime = mimetypes.guess_type(path)[0] or "application/octet-stream"
+            vlog(f"[static] 200 {path}")
             self.send_response(200)
             self.send_header("Content-Type", mime)
             self.end_headers()
             self.wfile.write(data)
         except FileNotFoundError:
+            print(f"[static] 404 {path}", flush=True)
             self.send_response(404)
             self.end_headers()
 
     def log_message(self, *_):
         pass
+
 
 HTTPServer(("0.0.0.0", PORT), Handler).serve_forever()
 PYEOF

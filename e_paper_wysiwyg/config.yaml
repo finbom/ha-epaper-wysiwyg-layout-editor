@@ -1,7 +1,7 @@
 name: "E-Paper WYSIWYG"
 slug: e_paper_wysiwyg
 description: "WYSIWYG layout editor for e-paper dashboards"
-version: "0.1.0"
+version: "0.1.1"
 startup: services
 boot: auto
 arch:
@@ -12,5 +12,7 @@ ingress: true
 ingress_port: 8099
 homeassistant_api: true
 hassio_api: true
-options: {}
-schema: {}
+options:
+  verbose_logging: false
+schema:
+  verbose_logging: bool

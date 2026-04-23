@@ -62,6 +62,24 @@ const mockHAEntities = {
 // Cache for live entity states from Home Assistant
 const haStateCache = {};
 const haEntities = {};  // Full entity objects (for dropdown labels)
+let VERBOSE = false;
+
+function vlog(...args) {
+  if (VERBOSE) console.log("[verbose]", ...args);
+}
+
+async function loadAddonConfig() {
+  try {
+    const base = window.location.href.replace(/\/?(\?.*)?$/, "/");
+    const resp = await fetch(base + "addon-config");
+    if (!resp.ok) return;
+    const cfg = await resp.json();
+    VERBOSE = cfg.verbose_logging === true;
+    if (VERBOSE) console.log("[verbose] Verbose logging enabled");
+  } catch {
+    // not running in HA — keep VERBOSE false
+  }
+}
 
 // Get entity state from cache (HA), fallback to mock data
 function getEntityState(entityId) {
@@ -153,12 +171,14 @@ function getSelectedElement() {
 }
 
 function selectElement(id) {
+  vlog("selectElement", id);
   selectedElementId = id;
   updateInspector();
   render();
 }
 
 function deselectElement() {
+  vlog("deselectElement");
   selectedElementId = null;
   updateInspector();
   render();
@@ -219,6 +239,7 @@ function deleteSelectedElement() {
   const index = layout.elements.findIndex((el) => el.id === selectedElementId);
   if (index === -1) return;
 
+  vlog("deleteElement", selectedElementId);
   layout.elements.splice(index, 1);
   selectedElementId = null;
   updateInspector();
@@ -410,6 +431,7 @@ sourceTypeInput.addEventListener("change", () => {
   const element = getSelectedElement();
   if (!element) return;
 
+  vlog("sourceType changed →", sourceTypeInput.value, "element", element.id);
   element.source.type = sourceTypeInput.value;
 
   if (element.source.type === "entity") {
@@ -434,6 +456,7 @@ entityInput.addEventListener("change", () => {
   const element = getSelectedElement();
   if (!element) return;
 
+  vlog("entity changed →", entityInput.value, "element", element.id);
   element.source.entity_id = entityInput.value;
 
   updateInspector();
@@ -472,8 +495,8 @@ setSizeButton.addEventListener("click", (e) => {
   }
 });
 
-// Load entity states from HA (falls back to mock data if unavailable)
-fetchHAStates();
+// Load addon config (verbose flag), then fetch HA states
+loadAddonConfig().then(() => fetchHAStates());
 
 // Add test element
 addText(50, 50, "Hello e-paper");
