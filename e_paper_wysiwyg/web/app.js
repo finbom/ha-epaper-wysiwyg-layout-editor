@@ -11,6 +11,7 @@ const boldInput = document.getElementById("bold-input");
 const italicInput = document.getElementById("italic-input");
 const sourceTypeInput = document.getElementById("source-type-input");
 const entityInput = document.getElementById("entity-input");
+const entitySearch = document.getElementById("entity-search");
 const entityLabel = document.getElementById("entity-label");
 const exportJsonButton = document.getElementById("export-json-btn");
 const exportOpenEpaperLinkButton = document.getElementById("export-openepaperlink-btn");
@@ -128,14 +129,17 @@ async function fetchHAStates() {
   }
 }
 
-function populateEntityOptions() {
-  entityInput.innerHTML = "";
+function populateEntityOptions(filter = "") {
   const source = Object.keys(haEntities).length > 0 ? haEntities : mockHAEntities;
+  const query = filter.toLowerCase();
+  entityInput.innerHTML = "";
   for (const entityId in source) {
+    const friendlyName = source[entityId].attributes?.friendly_name || entityId;
+    const label = `${friendlyName} (${entityId})`;
+    if (query && !label.toLowerCase().includes(query)) continue;
     const option = document.createElement("option");
     option.value = entityId;
-    const friendlyName = source[entityId].attributes?.friendly_name || entityId;
-    option.textContent = `${friendlyName} (${entityId})`;
+    option.textContent = label;
     entityInput.appendChild(option);
   }
 }
@@ -224,6 +228,7 @@ function updateInspector() {
   sourceTypeInput.value = element.source.type;
   if (element.source.type === "entity") {
     entityLabel.hidden = false;
+    entitySearch.value = "";
     populateEntityOptions();
     entityInput.value = element.source.entity_id;
   } else {
@@ -475,6 +480,14 @@ sourceTypeInput.addEventListener("change", () => {
 
   updateInspector();
   render(); // ✅ VIKTIGAST
+});
+
+entitySearch.addEventListener("input", () => {
+  const element = getSelectedElement();
+  populateEntityOptions(entitySearch.value);
+  if (element?.source?.entity_id) {
+    entityInput.value = element.source.entity_id;
+  }
 });
 
 entityInput.addEventListener("change", () => {
