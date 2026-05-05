@@ -1,7 +1,7 @@
 <p align="center">
   <img src="assets/logo.png" alt="Logo" width="300"/>
 </p>
-# STILL IN ALPHA! 
+# STILL IN ALPHA! Use on own risk. 
 
 # E-Paper WYSIWYG Layout Editor
 
